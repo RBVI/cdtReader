@@ -289,7 +289,7 @@ public class CDTImporter {
 
 	String[] readRow(BufferedReader input) throws IOException {
 		String row = input.readLine();
-		System.out.println("Row: "+row);
+		// System.out.println("Row: "+row);
 		if (row == null) return null;
 		String[] columns;
 		if (delimiter != null)
