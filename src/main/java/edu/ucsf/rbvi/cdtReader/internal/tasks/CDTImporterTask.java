@@ -37,11 +37,19 @@ public class CDTImporterTask extends AbstractTask {
 	@Tunable (description="Rows and columns are nodes", required=true, gravity=2.0)
 	public boolean columnNodes = false;
 
-	@Tunable (description="GTR file", required=false, params="input=true", gravity=3.0)
+	@Tunable (description="GTR file", required=false, params="input=true", gravity=4.0)
 	public File gtrFile;
 
-	@Tunable (description="ATR file", required=false, params="input=true", gravity=4.0)
+	@Tunable (description="ATR file", required=false, params="input=true", gravity=5.0)
 	public File atrFile;
+
+	@Tunable (description="Set missing data to 0.0", groups={"Advanced Options (uncommon)"}, 
+	          params="displayState=collapsed", required=true, gravity=6.0)
+	public boolean missingDataZero = false;
+
+	@Tunable (description="Adjust diagonals", groups={"Advanced Options (uncommon)"}, 
+	          params="displayState=collapsed",required=true, gravity=7.0)
+	public boolean adjustDiagonals = false;
 
 	final CyNetworkFactory cyNetworkFactory;
 	final CyNetworkManager cyNetworkManager;
@@ -66,7 +74,8 @@ public class CDTImporterTask extends AbstractTask {
 			return;
 		}
 		// Read our network from the CDT file
-		CyNetwork network = importer.readCDT(taskMonitor, cdtReader, cdtFile.getName(), columnNodes);
+		CyNetwork network = importer.readCDT(taskMonitor, cdtReader, cdtFile.getName(), columnNodes, 
+		                                     missingDataZero, adjustDiagonals);
 		CyTable networkTable = network.getDefaultNetworkTable();
 
 		// Get our array order

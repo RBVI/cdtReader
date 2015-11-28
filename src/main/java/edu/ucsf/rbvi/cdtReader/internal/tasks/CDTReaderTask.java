@@ -49,7 +49,7 @@ public class CDTReaderTask extends AbstractCyNetworkReader {
 	@Override
 	public void run(TaskMonitor taskMonitor) {
 		networks = new CyNetwork[1];
-		networks[0] = cdtImporter.readCDT(taskMonitor, input, inputName, null);
+		networks[0] = cdtImporter.readCDT(taskMonitor, input, inputName, false, false, false);
 	}
  
 	@Override

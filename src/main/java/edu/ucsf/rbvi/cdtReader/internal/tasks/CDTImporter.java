@@ -7,8 +7,10 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.cytoscape.model.CyEdge;
 import org.cytoscape.model.CyNetwork;
@@ -38,16 +40,18 @@ public class CDTImporter {
 	private List<String> arrayList = null;
 	private List<String> geneList = null;
 	private String delimiter = null;
+	double maxAttribute = -1.0d;
 
 	public CDTImporter(final CyNetworkFactory cyNetworkFactory) {
 		this.cyNetworkFactory = cyNetworkFactory;
 	}
 
 	public CyNetwork readCDT(TaskMonitor taskMonitor, BufferedReader reader,
-	                         String inputName, Boolean columnsAreNodes) {
+	                         String inputName, Boolean columnsAreNodes, Boolean setMissingToZero, Boolean adjustDiagonals) {
 		taskMonitor.showMessage(TaskMonitor.Level.INFO, "Reading CDT file '"+inputName+"'");
 
 		Map<String, CyNode> nodeMap = new HashMap<>();
+		HashSet<CyEdge> edgeSet = new HashSet<>();
 		gidMap = new HashMap<>();
 		arrayList = new ArrayList<>();
 		geneList = new ArrayList<>();
@@ -78,6 +82,7 @@ public class CDTImporter {
 			String[] aidRow;
 
 			String[] row;
+
 			while ((row = readRow(reader)) != null) {
 				if (!aidSeen && row[0].equals(AID)) {
 					aidSeen = true;
@@ -106,9 +111,16 @@ public class CDTImporter {
 				}
 
 				gidMap.put(row[0], row[nameColumn]);
-				createRow(network, headerRow, row, gWeightColumn, nameColumn, columnsAreNodes, nodeMap);
+				createRow(network, headerRow, row, gWeightColumn, nameColumn, columnsAreNodes, 
+				          setMissingToZero, nodeMap, edgeSet);
 
 				rowNumber++;
+			}
+
+			if (adjustDiagonals && symmetric) {
+				for (CyEdge edge: edgeSet) {
+					network.getRow(edge).set("weight", new Double(maxAttribute));
+				}
 			}
 
 		} catch(IOException ioe) {
@@ -196,7 +208,8 @@ public class CDTImporter {
 	}
 
 	void createRow(CyNetwork net, String[] headerRow, String[] dataRow, int gWeightColumn, 
-	               int nameColumn, boolean nodeColumns, Map<String, CyNode> nodeMap) {
+	               int nameColumn, boolean nodeColumns, boolean setMissingToZero, 
+								 Map<String, CyNode> nodeMap, Set<CyEdge> edgeSet) {
 		String sourceName = dataRow[nameColumn];
 		geneList.add(sourceName);
 		CyNode sourceNode = null;
@@ -220,17 +233,41 @@ public class CDTImporter {
 			// Now create the edges
 			for (int i = gWeightColumn+1; i < headerRow.length; i++) {
 				CyNode targetNode = nodeMap.get(headerRow[i]);
+				CyEdge edge = null;
 				if (targetNode == null) continue;
 				if (dataRow[i] != null && dataRow[i].length() > 1) {
-					CyEdge edge = net.addEdge(sourceNode, targetNode, false);
+					Double attrValue = new Double(dataRow[i]);
+					if (attrValue.doubleValue() > maxAttribute)
+						maxAttribute = attrValue.doubleValue();
+					edge = net.addEdge(sourceNode, targetNode, false);
 					net.getRow(edge).set("weight", new Double(dataRow[i]));
 					net.getRow(edge).set(CyNetwork.NAME, sourceName+" (weight) "+headerRow[i]);
 					net.getRow(edge).set(CyRootNetwork.SHARED_NAME, sourceName+" (weight) "+headerRow[i]);
+				} else if (setMissingToZero) {
+					edge = net.addEdge(sourceNode, targetNode, false);
+					net.getRow(edge).set("weight", new Double(0.0d));
+					net.getRow(edge).set(CyNetwork.NAME, sourceName+" (weight) "+headerRow[i]);
+					net.getRow(edge).set(CyRootNetwork.SHARED_NAME, sourceName+" (weight) "+headerRow[i]);
+					if (0.0d > maxAttribute)
+						maxAttribute = 0.0d;
+				}
+
+				if (edge != null && sourceNode == targetNode) {
+					edgeSet.add(edge);
 				}
 			}
 		} else {
 			for (int i = gWeightColumn+1; i < headerRow.length; i++) {
-				net.getRow(sourceNode).set(headerRow[i], new Double(dataRow[i]));
+				if (dataRow[i] != null && dataRow[i].length() > 0) {
+					Double attrValue = new Double(dataRow[i]);
+					net.getRow(sourceNode).set(headerRow[i], attrValue);
+					if (attrValue.doubleValue() > maxAttribute)
+						maxAttribute = attrValue.doubleValue();
+				} else if (setMissingToZero) {
+					net.getRow(sourceNode).set(headerRow[i], new Double(0.0d));
+					if (0.0d > maxAttribute)
+						maxAttribute = 0.0d;
+				}
 			}
 		}
 	}
